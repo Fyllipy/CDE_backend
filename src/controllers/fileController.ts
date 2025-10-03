@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { promises as fs } from "fs";
-import { listFiles, createOrUpdateFileRevision, getRevisionById } from "../services/fileService";
-import { getMembership, getNamingStandard } from "../services/projectService";
+import { listFiles, createOrUpdateFileRevision, getRevisionById, deleteFile } from "../services/fileService";
+import { getMembership, getNamingStandard, assertManager } from "../services/projectService";
 
 function getAuthUser(req: Request): { id: string } | undefined {
   return (req as Request & { user?: { id: string } }).user;
@@ -32,6 +32,7 @@ export async function uploadFile(req: Request, res: Response) {
   const user = getAuthUser(req);
   const projectId = req.params.projectId ?? '';
   const file = (req as Request & { file?: Express.Multer.File }).file;
+  const { description } = req.body as { description?: string };
 
   if (!user) {
     return res.status(401).json({ message: "Unauthorized" });
@@ -60,7 +61,8 @@ export async function uploadFile(req: Request, res: Response) {
     fileBuffer: file.buffer,
     originalFilename: file.originalname,
     uploadedBy: user.id,
-    namingPattern: pattern
+    namingPattern: pattern,
+    description: description?.trim() || undefined
   });
 
   return res.status(201).json(result);
@@ -92,4 +94,34 @@ export async function downloadRevision(req: Request, res: Response) {
   const fileBuffer = await fs.readFile(revision.storagePath);
   res.setHeader("Content-Disposition", 'attachment; filename="' + revision.originalFilename + '"');
   res.send(fileBuffer);
+}
+
+export async function deleteFileHandler(req: Request, res: Response) {
+  const user = getAuthUser(req);
+  const projectId = req.params.projectId ?? '';
+  const fileId = req.params.fileId ?? '';
+
+  if (!user) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  if (!projectId || !fileId) {
+    return res.status(400).json({ message: "Identifiers are required" });
+  }
+
+  try {
+    await assertManager(projectId, user.id);
+  } catch {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  try {
+    await deleteFile(projectId, fileId);
+  } catch (err) {
+    const status = (err as Error & { status?: number }).status ?? 500;
+    const message = status === 404 ? 'File not found' : 'Unable to delete file';
+    return res.status(status).json({ message });
+  }
+
+  return res.status(204).send();
 }

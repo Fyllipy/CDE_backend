@@ -15,7 +15,7 @@ const DEFAULT_COLUMN_COLOR = "#2563eb";
 async function listBoard(projectId) {
     var _a;
     const columnsResult = await pool_1.pool.query('SELECT id, "projectId", name, position, color, "createdAt", "updatedAt" FROM "KanbanColumn" WHERE "projectId" = $1 ORDER BY position ASC', [projectId]);
-    const cardsResult = await pool_1.pool.query('SELECT id, "columnId", "projectId", title, description, color, position, "createdAt", "updatedAt" FROM "KanbanCard" WHERE "projectId" = $1 ORDER BY position ASC', [projectId]);
+    const cardsResult = await pool_1.pool.query('SELECT id, "columnId", "projectId", title, description, position, "createdAt", "updatedAt" FROM "KanbanCard" WHERE "projectId" = $1 ORDER BY position ASC', [projectId]);
     const cardsByColumn = new Map();
     for (const card of cardsResult.rows) {
         const list = (_a = cardsByColumn.get(card.columnId)) !== null && _a !== void 0 ? _a : [];
@@ -49,11 +49,11 @@ async function updateColumn(columnId, data) {
 async function deleteColumn(columnId) {
     await pool_1.pool.query('DELETE FROM "KanbanColumn" WHERE id = $1', [columnId]);
 }
-async function createCard(columnId, projectId, title, description, color) {
+async function createCard(columnId, projectId, title, description) {
     var _a, _b;
     const positionResult = await pool_1.pool.query('SELECT MAX(position) as max FROM "KanbanCard" WHERE "columnId" = $1', [columnId]);
     const nextPosition = ((_b = (_a = positionResult.rows[0]) === null || _a === void 0 ? void 0 : _a.max) !== null && _b !== void 0 ? _b : -1) + 1;
-    const result = await pool_1.pool.query('INSERT INTO "KanbanCard" ("columnId", "projectId", title, description, color, position) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, "columnId", "projectId", title, description, color, position, "createdAt", "updatedAt"', [columnId, projectId, title, description, color !== null && color !== void 0 ? color : null, nextPosition]);
+    const result = await pool_1.pool.query('INSERT INTO "KanbanCard" ("columnId", "projectId", title, description, position) VALUES ($1, $2, $3, $4, $5) RETURNING id, "columnId", "projectId", title, description, position, "createdAt", "updatedAt"', [columnId, projectId, title, description, nextPosition]);
     const card = result.rows[0];
     if (!card) {
         throw new Error('Unable to create card');
@@ -61,8 +61,8 @@ async function createCard(columnId, projectId, title, description, color) {
     return card;
 }
 async function updateCard(cardId, fields) {
-    var _a, _b, _c;
-    const result = await pool_1.pool.query('UPDATE "KanbanCard" SET title = COALESCE($2, title), description = $3, color = COALESCE($4, color), "updatedAt" = NOW() WHERE id = $1 RETURNING id, "columnId", "projectId", title, description, color, position, "createdAt", "updatedAt"', [cardId, (_a = fields.title) !== null && _a !== void 0 ? _a : null, (_b = fields.description) !== null && _b !== void 0 ? _b : null, (_c = fields.color) !== null && _c !== void 0 ? _c : null]);
+    var _a, _b;
+    const result = await pool_1.pool.query('UPDATE "KanbanCard" SET title = COALESCE($2, title), description = $3, "updatedAt" = NOW() WHERE id = $1 RETURNING id, "columnId", "projectId", title, description, position, "createdAt", "updatedAt"', [cardId, (_a = fields.title) !== null && _a !== void 0 ? _a : null, (_b = fields.description) !== null && _b !== void 0 ? _b : null]);
     return result.rows[0];
 }
 async function deleteCard(cardId) {

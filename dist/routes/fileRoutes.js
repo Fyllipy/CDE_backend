@@ -10,4 +10,5 @@ exports.fileRouter.use(authMiddleware_1.requireAuth);
 exports.fileRouter.get("/:projectId/files", fileController_1.listProjectFiles);
 exports.fileRouter.post("/:projectId/files/upload", upload_1.upload.single("file"), fileController_1.uploadFile);
 exports.fileRouter.get("/:projectId/files/revisions/:revisionId", fileController_1.downloadRevision);
+exports.fileRouter.delete("/:projectId/files/:fileId", fileController_1.deleteFileHandler);
 //# sourceMappingURL=fileRoutes.js.map

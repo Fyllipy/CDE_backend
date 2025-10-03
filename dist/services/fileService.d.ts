@@ -17,6 +17,7 @@ export interface FileRevision {
     uploadedByEmail?: string;
     storagePath: string;
     originalFilename: string;
+    description: string | null;
     createdAt: Date;
 }
 export declare function ensureUploadDir(): Promise<string | undefined>;
@@ -29,6 +30,7 @@ export declare function createOrUpdateFileRevision(options: {
     uploadedBy: string;
     namingPattern: string;
     overrideBaseName?: string;
+    description?: string;
 }): Promise<{
     file: StoredFile;
     revision: FileRevision;
@@ -37,3 +39,4 @@ export declare function listFiles(projectId: string): Promise<Array<StoredFile &
     revisions: FileRevision[];
 }>>;
 export declare function getRevisionById(id: string): Promise<FileRevision | undefined>;
+export declare function deleteFile(projectId: string, fileId: string): Promise<void>;

@@ -16,7 +16,6 @@ export interface KanbanCard {
   projectId: string;
   title: string;
   description: string | null;
-  color: string | null;
   position: number;
   createdAt: Date;
   updatedAt: Date;
@@ -31,7 +30,7 @@ export async function listBoard(projectId: string): Promise<Array<KanbanColumn &
   );
 
   const cardsResult = await pool.query<KanbanCard>(
-    'SELECT id, "columnId", "projectId", title, description, color, position, "createdAt", "updatedAt" FROM "KanbanCard" WHERE "projectId" = $1 ORDER BY position ASC',
+    'SELECT id, "columnId", "projectId", title, description, position, "createdAt", "updatedAt" FROM "KanbanCard" WHERE "projectId" = $1 ORDER BY position ASC',
     [projectId]
   );
 
@@ -78,7 +77,7 @@ export async function deleteColumn(columnId: string): Promise<void> {
   await pool.query('DELETE FROM "KanbanColumn" WHERE id = $1', [columnId]);
 }
 
-export async function createCard(columnId: string, projectId: string, title: string, description: string | null, color?: string | null): Promise<KanbanCard> {
+export async function createCard(columnId: string, projectId: string, title: string, description: string | null): Promise<KanbanCard> {
   const positionResult = await pool.query<{ max: number | null }>(
     'SELECT MAX(position) as max FROM "KanbanCard" WHERE "columnId" = $1',
     [columnId]
@@ -86,8 +85,8 @@ export async function createCard(columnId: string, projectId: string, title: str
   const nextPosition = (positionResult.rows[0]?.max ?? -1) + 1;
 
   const result = await pool.query<KanbanCard>(
-    'INSERT INTO "KanbanCard" ("columnId", "projectId", title, description, color, position) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, "columnId", "projectId", title, description, color, position, "createdAt", "updatedAt"',
-    [columnId, projectId, title, description, color ?? null, nextPosition]
+    'INSERT INTO "KanbanCard" ("columnId", "projectId", title, description, position) VALUES ($1, $2, $3, $4, $5) RETURNING id, "columnId", "projectId", title, description, position, "createdAt", "updatedAt"',
+    [columnId, projectId, title, description, nextPosition]
   );
   const card = result.rows[0];
   if (!card) {
@@ -96,10 +95,10 @@ export async function createCard(columnId: string, projectId: string, title: str
   return card;
 }
 
-export async function updateCard(cardId: string, fields: { title?: string; description?: string | null; color?: string | null }): Promise<KanbanCard | undefined> {
+export async function updateCard(cardId: string, fields: { title?: string; description?: string | null }): Promise<KanbanCard | undefined> {
   const result = await pool.query<KanbanCard>(
-    'UPDATE "KanbanCard" SET title = COALESCE($2, title), description = $3, color = COALESCE($4, color), "updatedAt" = NOW() WHERE id = $1 RETURNING id, "columnId", "projectId", title, description, color, position, "createdAt", "updatedAt"',
-    [cardId, fields.title ?? null, fields.description ?? null, fields.color ?? null]
+    'UPDATE "KanbanCard" SET title = COALESCE($2, title), description = $3, "updatedAt" = NOW() WHERE id = $1 RETURNING id, "columnId", "projectId", title, description, position, "createdAt", "updatedAt"',
+    [cardId, fields.title ?? null, fields.description ?? null]
   );
   return result.rows[0];
 }

@@ -122,7 +122,7 @@ export async function createCardHandler(req: Request, res: Response) {
   const user = getAuthUser(req);
   const projectId = req.params.projectId ?? '';
   const columnId = req.params.columnId ?? '';
-  const { title, description, color } = req.body as { title: string; description?: string; color?: string | null };
+  const { title, description } = req.body as { title: string; description?: string };
 
   if (!user) {
     return res.status(401).json({ message: "Unauthorized" });
@@ -141,7 +141,7 @@ export async function createCardHandler(req: Request, res: Response) {
     return res.status(400).json({ message: "Title is required" });
   }
 
-  const card = await createCard(columnId, projectId, title, description ?? null, color ?? null);
+  const card = await createCard(columnId, projectId, title, description ?? null);
   return res.status(201).json({ card });
 }
 
@@ -149,7 +149,7 @@ export async function updateCardHandler(req: Request, res: Response) {
   const user = getAuthUser(req);
   const projectId = req.params.projectId ?? '';
   const cardId = req.params.cardId ?? '';
-  const { title, description, color } = req.body as { title?: string; description?: string | null; color?: string | null };
+  const { title, description } = req.body as { title?: string; description?: string | null };
 
   if (!user) {
     return res.status(401).json({ message: "Unauthorized" });
@@ -164,7 +164,7 @@ export async function updateCardHandler(req: Request, res: Response) {
     return res.status(403).json({ message: "Forbidden" });
   }
 
-  const card = await updateCard(cardId, { title, description: description ?? null, color: color ?? null });
+  const card = await updateCard(cardId, { title, description: description ?? null });
   return res.json({ card });
 }
 

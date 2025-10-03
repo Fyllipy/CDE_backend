@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS "FileRevision" (
     "uploadedById" UUID NOT NULL REFERENCES "User"(id),
     "storagePath" TEXT NOT NULL,
     "originalFilename" TEXT NOT NULL,
+    description TEXT,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT unique_file_revision UNIQUE ("fileId", "revisionIndex")
 );

@@ -23,6 +23,7 @@ export interface FileRevision {
   uploadedByEmail?: string;
   storagePath: string;
   originalFilename: string;
+  description: string | null;
   createdAt: Date;
 }
 
@@ -32,8 +33,8 @@ export function ensureUploadDir() {
 
 function getRevisionLabel(index: number): string {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const letter = alphabet[index] ?? "X" + index.toString();
-  return "rev" + letter;
+  const letter = alphabet[index] ?? `X${index}`;
+  return `rev${letter}`;
 }
 
 function deriveBaseName(raw: string): string {
@@ -46,36 +47,36 @@ function deriveBaseName(raw: string): string {
 }
 
 export function buildStoragePath(projectId: string, fileId: string, revisionLabel: string, extension: string): string {
-  return join(env.uploadDir, projectId, fileId, revisionLabel + "." + extension);
+  return join(env.uploadDir, projectId, fileId, `${revisionLabel}.${extension}`);
 }
 
 export async function validateAgainstNamingStandard(baseName: string, pattern: string): Promise<void> {
   const tokens = pattern.split("-");
   const values = baseName.split("-");
   if (tokens.length !== values.length) {
-    throw Object.assign(new Error("Nome de arquivo não segue o padrão"), { status: 400 });
+    throw Object.assign(new Error("File name does not match the configured pattern"), { status: 400 });
   }
 
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i] ?? "";
     const value = values[i] ?? "";
     if (!token || !value) {
-      throw Object.assign(new Error("Segmento vazio na nomenclatura"), { status: 400 });
+      throw Object.assign(new Error("Empty segment detected in naming pattern"), { status: 400 });
     }
     const isPlaceholder = token.startsWith("{") && token.endsWith("}");
     if (!isPlaceholder && token !== value) {
-      throw Object.assign(new Error('Segmento "' + value + '" não corresponde a "' + token + '"'), { status: 400 });
+      throw Object.assign(new Error(`Segment "${value}" does not match "${token}"`), { status: 400 });
     }
   }
 }
 
 function splitNameAndExtension(original: string): { baseName: string; extension: string } {
-  const segments = original.split('.');
+  const segments = original.split(".");
   if (segments.length <= 1) {
-    return { baseName: original, extension: 'dat' };
+    return { baseName: original, extension: "dat" };
   }
-  const extension = segments.pop() ?? 'dat';
-  const baseName = segments.join('.') || original;
+  const extension = segments.pop() ?? "dat";
+  const baseName = segments.join(".") || original;
   return { baseName, extension };
 }
 
@@ -86,6 +87,7 @@ export async function createOrUpdateFileRevision(options: {
   uploadedBy: string;
   namingPattern: string;
   overrideBaseName?: string;
+  description?: string;
 }): Promise<{ file: StoredFile; revision: FileRevision }> {
   return withTransaction(async (client) => {
     await ensureUploadDir();
@@ -118,7 +120,7 @@ export async function createOrUpdateFileRevision(options: {
     }
 
     if (!file) {
-      throw new Error('Unable to persist file metadata');
+      throw new Error("Unable to persist file metadata");
     }
 
     const revisionLabel = getRevisionLabel(revisionIndex);
@@ -128,20 +130,14 @@ export async function createOrUpdateFileRevision(options: {
     await fs.writeFile(storagePath, options.fileBuffer);
 
     const revisionInsert = await client.query<FileRevision>(
-      'INSERT INTO "FileRevision" ("fileId", "revisionIndex", "revisionLabel", "uploadedById", "storagePath", "originalFilename") VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, "fileId", "revisionIndex", "revisionLabel", "uploadedById", "storagePath", "originalFilename", "createdAt"',
-      [file.id, revisionIndex, revisionLabel, options.uploadedBy, storagePath, options.originalFilename]
+      'INSERT INTO "FileRevision" ("fileId", "revisionIndex", "revisionLabel", "uploadedById", "storagePath", "originalFilename", description) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, "fileId", "revisionIndex", "revisionLabel", "uploadedById", "storagePath", "originalFilename", description, "createdAt"',
+      [file.id, revisionIndex, revisionLabel, options.uploadedBy, storagePath, options.originalFilename, options.description ?? null]
     );
 
-    const insertedRevision = revisionInsert.rows[0];
-    if (!insertedRevision) {
-      throw new Error('Unable to persist file revision');
+    const revision = revisionInsert.rows[0];
+    if (!revision) {
+      throw new Error("Unable to persist file revision");
     }
-
-    const revision: FileRevision = {
-      ...insertedRevision,
-      uploadedByName: undefined,
-      uploadedByEmail: undefined
-    };
 
     const updated = await client.query<StoredFile>(
       'UPDATE "File" SET "currentRevisionId" = $2, "updatedAt" = NOW() WHERE id = $1 RETURNING id, "projectId", "baseName", extension, "currentRevisionId", "createdAt", "updatedAt"',
@@ -150,7 +146,7 @@ export async function createOrUpdateFileRevision(options: {
 
     const updatedFile = updated.rows[0];
     if (!updatedFile) {
-      throw new Error('Unable to update file revision pointer');
+      throw new Error("Unable to update file revision pointer");
     }
 
     return { file: updatedFile, revision };
@@ -169,7 +165,7 @@ export async function listFiles(projectId: string): Promise<Array<StoredFile & {
 
   const fileIds = filesResult.rows.map((item: StoredFile) => item.id);
   const revisionsResult = await pool.query<FileRevision>(
-    'SELECT fr.id, fr."fileId", fr."revisionIndex", fr."revisionLabel", fr."uploadedById", fr."storagePath", fr."originalFilename", fr."createdAt", u.name as "uploadedByName", u.email as "uploadedByEmail" FROM "FileRevision" fr LEFT JOIN "User" u ON u.id = fr."uploadedById" WHERE fr."fileId" = ANY($1::uuid[]) ORDER BY fr."revisionIndex" DESC',
+    'SELECT fr.id, fr."fileId", fr."revisionIndex", fr."revisionLabel", fr."uploadedById", fr."storagePath", fr."originalFilename", fr.description, fr."createdAt", u.name as "uploadedByName", u.email as "uploadedByEmail" FROM "FileRevision" fr LEFT JOIN "User" u ON u.id = fr."uploadedById" WHERE fr."fileId" = ANY($1::uuid[]) ORDER BY fr."revisionIndex" DESC',
     [fileIds]
   );
 
@@ -188,8 +184,42 @@ export async function listFiles(projectId: string): Promise<Array<StoredFile & {
 
 export async function getRevisionById(id: string): Promise<FileRevision | undefined> {
   const result = await pool.query<FileRevision>(
-    'SELECT fr.id, fr."fileId", fr."revisionIndex", fr."revisionLabel", fr."uploadedById", fr."storagePath", fr."originalFilename", fr."createdAt", u.name as "uploadedByName", u.email as "uploadedByEmail" FROM "FileRevision" fr LEFT JOIN "User" u ON u.id = fr."uploadedById" WHERE fr.id = $1',
+    'SELECT fr.id, fr."fileId", fr."revisionIndex", fr."revisionLabel", fr."uploadedById", fr."storagePath", fr."originalFilename", fr.description, fr."createdAt", u.name as "uploadedByName", u.email as "uploadedByEmail" FROM "FileRevision" fr LEFT JOIN "User" u ON u.id = fr."uploadedById" WHERE fr.id = $1',
     [id]
   );
   return result.rows[0];
+}
+
+export async function deleteFile(projectId: string, fileId: string): Promise<void> {
+  const fileResult = await pool.query<StoredFile>(
+    'SELECT id FROM "File" WHERE id = $1 AND "projectId" = $2',
+    [fileId, projectId]
+  );
+  if (!fileResult.rowCount) {
+    throw Object.assign(new Error('File not found'), { status: 404 });
+  }
+
+  const revisions = await pool.query<{ storagePath: string }>(
+    'SELECT "storagePath" FROM "FileRevision" WHERE "fileId" = $1',
+    [fileId]
+  );
+
+  for (const revision of revisions.rows) {
+    try {
+      await fs.unlink(revision.storagePath);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw err;
+      }
+    }
+  }
+
+  const dir = join(env.uploadDir, projectId, fileId);
+  try {
+    await fs.rm(dir, { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
+
+  await pool.query('DELETE FROM "File" WHERE id = $1', [fileId]);
 }

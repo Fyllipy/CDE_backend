@@ -13,7 +13,6 @@ export interface KanbanCard {
     projectId: string;
     title: string;
     description: string | null;
-    color: string | null;
     position: number;
     createdAt: Date;
     updatedAt: Date;
@@ -27,11 +26,10 @@ export declare function updateColumn(columnId: string, data: {
     color?: string;
 }): Promise<KanbanColumn | undefined>;
 export declare function deleteColumn(columnId: string): Promise<void>;
-export declare function createCard(columnId: string, projectId: string, title: string, description: string | null, color?: string | null): Promise<KanbanCard>;
+export declare function createCard(columnId: string, projectId: string, title: string, description: string | null): Promise<KanbanCard>;
 export declare function updateCard(cardId: string, fields: {
     title?: string;
     description?: string | null;
-    color?: string | null;
 }): Promise<KanbanCard | undefined>;
 export declare function deleteCard(cardId: string): Promise<void>;
 export declare function moveCard(cardId: string, toColumnId: string, newPosition: number): Promise<void>;

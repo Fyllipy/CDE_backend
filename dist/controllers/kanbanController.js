@@ -102,7 +102,7 @@ async function createCardHandler(req, res) {
     const user = getAuthUser(req);
     const projectId = (_a = req.params.projectId) !== null && _a !== void 0 ? _a : '';
     const columnId = (_b = req.params.columnId) !== null && _b !== void 0 ? _b : '';
-    const { title, description, color } = req.body;
+    const { title, description } = req.body;
     if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
     }
@@ -116,7 +116,7 @@ async function createCardHandler(req, res) {
     if (!title) {
         return res.status(400).json({ message: "Title is required" });
     }
-    const card = await (0, kanbanService_1.createCard)(columnId, projectId, title, description !== null && description !== void 0 ? description : null, color !== null && color !== void 0 ? color : null);
+    const card = await (0, kanbanService_1.createCard)(columnId, projectId, title, description !== null && description !== void 0 ? description : null);
     return res.status(201).json({ card });
 }
 async function updateCardHandler(req, res) {
@@ -124,7 +124,7 @@ async function updateCardHandler(req, res) {
     const user = getAuthUser(req);
     const projectId = (_a = req.params.projectId) !== null && _a !== void 0 ? _a : '';
     const cardId = (_b = req.params.cardId) !== null && _b !== void 0 ? _b : '';
-    const { title, description, color } = req.body;
+    const { title, description } = req.body;
     if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
     }
@@ -135,7 +135,7 @@ async function updateCardHandler(req, res) {
     if (!isMember) {
         return res.status(403).json({ message: "Forbidden" });
     }
-    const card = await (0, kanbanService_1.updateCard)(cardId, { title, description: description !== null && description !== void 0 ? description : null, color: color !== null && color !== void 0 ? color : null });
+    const card = await (0, kanbanService_1.updateCard)(cardId, { title, description: description !== null && description !== void 0 ? description : null });
     return res.json({ card });
 }
 async function deleteCardHandler(req, res) {
