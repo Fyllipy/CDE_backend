@@ -1,0 +1,10 @@
+import { Request, Response } from "express";
+export declare function listMyProjects(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function createProjectHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function getProjectHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function updateProjectHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function deleteProjectHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function listMembersHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function addMemberHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function removeMemberHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function updateNamingStandardHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;

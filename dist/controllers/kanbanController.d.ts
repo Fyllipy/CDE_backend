@@ -1,0 +1,11 @@
+import { Request, Response } from "express";
+export declare function getBoard(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function createColumnHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function renameColumnHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function deleteColumnHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function createCardHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function updateCardHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function deleteCardHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function moveCardHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function reorderColumnsHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function reorderCardsHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;

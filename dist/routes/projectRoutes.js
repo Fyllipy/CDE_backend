@@ -1,0 +1,18 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.projectRouter = void 0;
+const express_1 = require("express");
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const projectController_1 = require("../controllers/projectController");
+exports.projectRouter = (0, express_1.Router)();
+exports.projectRouter.use(authMiddleware_1.requireAuth);
+exports.projectRouter.get("/", projectController_1.listMyProjects);
+exports.projectRouter.post("/", projectController_1.createProjectHandler);
+exports.projectRouter.get("/:projectId", projectController_1.getProjectHandler);
+exports.projectRouter.put("/:projectId", projectController_1.updateProjectHandler);
+exports.projectRouter.delete("/:projectId", projectController_1.deleteProjectHandler);
+exports.projectRouter.get("/:projectId/members", projectController_1.listMembersHandler);
+exports.projectRouter.post("/:projectId/members", projectController_1.addMemberHandler);
+exports.projectRouter.delete("/:projectId/members/:memberId", projectController_1.removeMemberHandler);
+exports.projectRouter.patch("/:projectId/naming-standard", projectController_1.updateNamingStandardHandler);
+//# sourceMappingURL=projectRoutes.js.map
