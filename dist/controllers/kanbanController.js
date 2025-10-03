@@ -40,7 +40,7 @@ async function createColumnHandler(req, res) {
     var _a;
     const user = getAuthUser(req);
     const projectId = (_a = req.params.projectId) !== null && _a !== void 0 ? _a : '';
-    const { name } = req.body;
+    const { name, color } = req.body;
     if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
     }
@@ -54,7 +54,7 @@ async function createColumnHandler(req, res) {
     if (!name) {
         return res.status(400).json({ message: "Column name is required" });
     }
-    const column = await (0, kanbanService_1.createColumn)(projectId, name);
+    const column = await (0, kanbanService_1.createColumn)(projectId, name, color);
     return res.status(201).json({ column });
 }
 async function renameColumnHandler(req, res) {
@@ -62,18 +62,21 @@ async function renameColumnHandler(req, res) {
     const user = getAuthUser(req);
     const projectId = (_a = req.params.projectId) !== null && _a !== void 0 ? _a : '';
     const columnId = (_b = req.params.columnId) !== null && _b !== void 0 ? _b : '';
-    const { name } = req.body;
+    const { name, color } = req.body;
     if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
     }
     if (!projectId || !columnId) {
         return res.status(400).json({ message: "Identifiers are required" });
     }
+    if (!name && !color) {
+        return res.status(400).json({ message: "Nothing to update" });
+    }
     const isMember = await ensureMember(projectId, user.id);
     if (!isMember) {
         return res.status(403).json({ message: "Forbidden" });
     }
-    const column = await (0, kanbanService_1.renameColumn)(columnId, name);
+    const column = await (0, kanbanService_1.updateColumn)(columnId, { name, color });
     return res.json({ column });
 }
 async function deleteColumnHandler(req, res) {
@@ -99,7 +102,7 @@ async function createCardHandler(req, res) {
     const user = getAuthUser(req);
     const projectId = (_a = req.params.projectId) !== null && _a !== void 0 ? _a : '';
     const columnId = (_b = req.params.columnId) !== null && _b !== void 0 ? _b : '';
-    const { title, description } = req.body;
+    const { title, description, color } = req.body;
     if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
     }
@@ -113,7 +116,7 @@ async function createCardHandler(req, res) {
     if (!title) {
         return res.status(400).json({ message: "Title is required" });
     }
-    const card = await (0, kanbanService_1.createCard)(columnId, projectId, title, description !== null && description !== void 0 ? description : null);
+    const card = await (0, kanbanService_1.createCard)(columnId, projectId, title, description !== null && description !== void 0 ? description : null, color !== null && color !== void 0 ? color : null);
     return res.status(201).json({ card });
 }
 async function updateCardHandler(req, res) {
@@ -121,7 +124,7 @@ async function updateCardHandler(req, res) {
     const user = getAuthUser(req);
     const projectId = (_a = req.params.projectId) !== null && _a !== void 0 ? _a : '';
     const cardId = (_b = req.params.cardId) !== null && _b !== void 0 ? _b : '';
-    const { title, description } = req.body;
+    const { title, description, color } = req.body;
     if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
     }
@@ -132,7 +135,7 @@ async function updateCardHandler(req, res) {
     if (!isMember) {
         return res.status(403).json({ message: "Forbidden" });
     }
-    const card = await (0, kanbanService_1.updateCard)(cardId, { title, description: description !== null && description !== void 0 ? description : null });
+    const card = await (0, kanbanService_1.updateCard)(cardId, { title, description: description !== null && description !== void 0 ? description : null, color: color !== null && color !== void 0 ? color : null });
     return res.json({ card });
 }
 async function deleteCardHandler(req, res) {

@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS "KanbanColumn" (
     "projectId" UUID NOT NULL REFERENCES "Project"(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     position INTEGER NOT NULL,
+    color TEXT NOT NULL DEFAULT '#2563eb',
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT unique_project_column UNIQUE ("projectId", position)
@@ -72,6 +73,7 @@ CREATE TABLE IF NOT EXISTS "KanbanCard" (
     "projectId" UUID NOT NULL REFERENCES "Project"(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     description TEXT,
+    color TEXT,
     position INTEGER NOT NULL,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()

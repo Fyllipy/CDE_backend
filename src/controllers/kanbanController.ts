@@ -1,5 +1,16 @@
 import { Request, Response } from "express";
-import { listBoard, createColumn, renameColumn, deleteColumn, createCard, updateCard, deleteCard, moveCard, reorderColumns, reorderCards } from "../services/kanbanService";
+import {
+  listBoard,
+  createColumn,
+  updateColumn,
+  deleteColumn,
+  createCard,
+  updateCard,
+  deleteCard,
+  moveCard,
+  reorderColumns,
+  reorderCards
+} from "../services/kanbanService";
 import { getMembership } from "../services/projectService";
 
 function getAuthUser(req: Request): { id: string } | undefined {
@@ -35,7 +46,7 @@ export async function getBoard(req: Request, res: Response) {
 export async function createColumnHandler(req: Request, res: Response) {
   const user = getAuthUser(req);
   const projectId = req.params.projectId ?? '';
-  const { name } = req.body as { name: string };
+  const { name, color } = req.body as { name: string; color?: string };
 
   if (!user) {
     return res.status(401).json({ message: "Unauthorized" });
@@ -54,7 +65,7 @@ export async function createColumnHandler(req: Request, res: Response) {
     return res.status(400).json({ message: "Column name is required" });
   }
 
-  const column = await createColumn(projectId, name);
+  const column = await createColumn(projectId, name, color);
   return res.status(201).json({ column });
 }
 
@@ -62,7 +73,7 @@ export async function renameColumnHandler(req: Request, res: Response) {
   const user = getAuthUser(req);
   const projectId = req.params.projectId ?? '';
   const columnId = req.params.columnId ?? '';
-  const { name } = req.body as { name: string };
+  const { name, color } = req.body as { name?: string; color?: string };
 
   if (!user) {
     return res.status(401).json({ message: "Unauthorized" });
@@ -72,12 +83,16 @@ export async function renameColumnHandler(req: Request, res: Response) {
     return res.status(400).json({ message: "Identifiers are required" });
   }
 
+  if (!name && !color) {
+    return res.status(400).json({ message: "Nothing to update" });
+  }
+
   const isMember = await ensureMember(projectId, user.id);
   if (!isMember) {
     return res.status(403).json({ message: "Forbidden" });
   }
 
-  const column = await renameColumn(columnId, name);
+  const column = await updateColumn(columnId, { name, color });
   return res.json({ column });
 }
 
@@ -107,7 +122,7 @@ export async function createCardHandler(req: Request, res: Response) {
   const user = getAuthUser(req);
   const projectId = req.params.projectId ?? '';
   const columnId = req.params.columnId ?? '';
-  const { title, description } = req.body as { title: string; description?: string };
+  const { title, description, color } = req.body as { title: string; description?: string; color?: string | null };
 
   if (!user) {
     return res.status(401).json({ message: "Unauthorized" });
@@ -126,7 +141,7 @@ export async function createCardHandler(req: Request, res: Response) {
     return res.status(400).json({ message: "Title is required" });
   }
 
-  const card = await createCard(columnId, projectId, title, description ?? null);
+  const card = await createCard(columnId, projectId, title, description ?? null, color ?? null);
   return res.status(201).json({ card });
 }
 
@@ -134,7 +149,7 @@ export async function updateCardHandler(req: Request, res: Response) {
   const user = getAuthUser(req);
   const projectId = req.params.projectId ?? '';
   const cardId = req.params.cardId ?? '';
-  const { title, description } = req.body as { title?: string; description?: string | null };
+  const { title, description, color } = req.body as { title?: string; description?: string | null; color?: string | null };
 
   if (!user) {
     return res.status(401).json({ message: "Unauthorized" });
@@ -149,7 +164,7 @@ export async function updateCardHandler(req: Request, res: Response) {
     return res.status(403).json({ message: "Forbidden" });
   }
 
-  const card = await updateCard(cardId, { title, description: description ?? null });
+  const card = await updateCard(cardId, { title, description: description ?? null, color: color ?? null });
   return res.json({ card });
 }
 
