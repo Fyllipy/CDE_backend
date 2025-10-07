@@ -223,3 +223,51 @@ export async function deleteFile(projectId: string, fileId: string): Promise<voi
 
   await pool.query('DELETE FROM "File" WHERE id = $1', [fileId]);
 }
+
+export async function deleteRevision(projectId: string, revisionId: string): Promise<void> {
+  await withTransaction(async (client) => {
+    const revisionResult = await client.query<{ fileId: string; projectId: string; storagePath: string }>(
+      'SELECT fr."fileId", f."projectId", fr."storagePath" FROM "FileRevision" fr INNER JOIN "File" f ON f.id = fr."fileId" WHERE fr.id = $1',
+      [revisionId]
+    );
+
+    const revision = revisionResult.rows[0];
+    if (!revision) {
+      throw Object.assign(new Error('Revision not found'), { status: 404 });
+    }
+    if (revision.projectId !== projectId) {
+      throw Object.assign(new Error('Revision not found'), { status: 404 });
+    }
+
+    try {
+      await fs.unlink(revision.storagePath);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw err;
+      }
+    }
+
+    await client.query('DELETE FROM "FileRevision" WHERE id = $1', [revisionId]);
+
+    const latest = await client.query<{ id: string }>(
+      'SELECT id FROM "FileRevision" WHERE "fileId" = $1 ORDER BY "revisionIndex" DESC LIMIT 1',
+      [revision.fileId]
+    );
+
+    const latestRow = latest.rows[0];
+
+    if (latestRow) {
+      await client.query(
+        'UPDATE "File" SET "currentRevisionId" = $2, "updatedAt" = NOW() WHERE id = $1',
+        [revision.fileId, latestRow.id]
+      );
+    } else {
+      await client.query('DELETE FROM "File" WHERE id = $1', [revision.fileId]);
+      try {
+        await fs.rm(join(env.uploadDir, projectId, revision.fileId), { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+    }
+  });
+}

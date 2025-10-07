@@ -4,6 +4,7 @@ exports.listProjectFiles = listProjectFiles;
 exports.uploadFile = uploadFile;
 exports.downloadRevision = downloadRevision;
 exports.deleteFileHandler = deleteFileHandler;
+exports.deleteRevisionHandler = deleteRevisionHandler;
 const fs_1 = require("fs");
 const fileService_1 = require("../services/fileService");
 const projectService_1 = require("../services/projectService");
@@ -106,6 +107,33 @@ async function deleteFileHandler(req, res) {
     catch (err) {
         const status = (_c = err.status) !== null && _c !== void 0 ? _c : 500;
         const message = status === 404 ? 'File not found' : 'Unable to delete file';
+        return res.status(status).json({ message });
+    }
+    return res.status(204).send();
+}
+async function deleteRevisionHandler(req, res) {
+    var _a, _b, _c;
+    const user = getAuthUser(req);
+    const projectId = (_a = req.params.projectId) !== null && _a !== void 0 ? _a : '';
+    const revisionId = (_b = req.params.revisionId) !== null && _b !== void 0 ? _b : '';
+    if (!user) {
+        return res.status(401).json({ message: 'Unauthorized' });
+    }
+    if (!projectId || !revisionId) {
+        return res.status(400).json({ message: 'Identifiers are required' });
+    }
+    try {
+        await (0, projectService_1.assertManager)(projectId, user.id);
+    }
+    catch {
+        return res.status(403).json({ message: 'Forbidden' });
+    }
+    try {
+        await (0, fileService_1.deleteRevision)(projectId, revisionId);
+    }
+    catch (err) {
+        const status = (_c = err.status) !== null && _c !== void 0 ? _c : 500;
+        const message = status === 404 ? 'Revision not found' : 'Unable to delete revision';
         return res.status(status).json({ message });
     }
     return res.status(204).send();

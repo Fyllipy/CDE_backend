@@ -7,6 +7,7 @@ exports.createOrUpdateFileRevision = createOrUpdateFileRevision;
 exports.listFiles = listFiles;
 exports.getRevisionById = getRevisionById;
 exports.deleteFile = deleteFile;
+exports.deleteRevision = deleteRevision;
 const fs_1 = require("fs");
 const path_1 = require("path");
 const pool_1 = require("../db/pool");
@@ -149,5 +150,40 @@ async function deleteFile(projectId, fileId) {
         /* ignore */
     }
     await pool_1.pool.query('DELETE FROM "File" WHERE id = $1', [fileId]);
+}
+async function deleteRevision(projectId, revisionId) {
+    await (0, pool_1.withTransaction)(async (client) => {
+        const revisionResult = await client.query('SELECT fr."fileId", f."projectId", fr."storagePath" FROM "FileRevision" fr INNER JOIN "File" f ON f.id = fr."fileId" WHERE fr.id = $1', [revisionId]);
+        const revision = revisionResult.rows[0];
+        if (!revision) {
+            throw Object.assign(new Error('Revision not found'), { status: 404 });
+        }
+        if (revision.projectId !== projectId) {
+            throw Object.assign(new Error('Revision not found'), { status: 404 });
+        }
+        try {
+            await fs_1.promises.unlink(revision.storagePath);
+        }
+        catch (err) {
+            if (err.code !== 'ENOENT') {
+                throw err;
+            }
+        }
+        await client.query('DELETE FROM "FileRevision" WHERE id = $1', [revisionId]);
+        const latest = await client.query('SELECT id FROM "FileRevision" WHERE "fileId" = $1 ORDER BY "revisionIndex" DESC LIMIT 1', [revision.fileId]);
+        const latestRow = latest.rows[0];
+        if (latestRow) {
+            await client.query('UPDATE "File" SET "currentRevisionId" = $2, "updatedAt" = NOW() WHERE id = $1', [revision.fileId, latestRow.id]);
+        }
+        else {
+            await client.query('DELETE FROM "File" WHERE id = $1', [revision.fileId]);
+            try {
+                await fs_1.promises.rm((0, path_1.join)(env_1.env.uploadDir, projectId, revision.fileId), { recursive: true, force: true });
+            }
+            catch {
+                /* ignore */
+            }
+        }
+    });
 }
 //# sourceMappingURL=fileService.js.map

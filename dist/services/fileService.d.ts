@@ -40,3 +40,4 @@ export declare function listFiles(projectId: string): Promise<Array<StoredFile &
 }>>;
 export declare function getRevisionById(id: string): Promise<FileRevision | undefined>;
 export declare function deleteFile(projectId: string, fileId: string): Promise<void>;
+export declare function deleteRevision(projectId: string, revisionId: string): Promise<void>;

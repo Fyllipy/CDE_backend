@@ -74,7 +74,6 @@ CREATE TABLE IF NOT EXISTS "KanbanCard" (
     "projectId" UUID NOT NULL REFERENCES "Project"(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     description TEXT,
-    color TEXT,
     position INTEGER NOT NULL,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -84,3 +83,17 @@ CREATE INDEX IF NOT EXISTS idx_file_project ON "File"("projectId");
 CREATE INDEX IF NOT EXISTS idx_filerevision_file ON "FileRevision"("fileId");
 CREATE INDEX IF NOT EXISTS idx_kanbancolumn_project ON "KanbanColumn"("projectId");
 CREATE INDEX IF NOT EXISTS idx_kanbancard_column ON "KanbanCard"("columnId");
+
+CREATE TABLE IF NOT EXISTS "GeneralDocument" (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "projectId" UUID NOT NULL REFERENCES "Project"(id) ON DELETE CASCADE,
+    category TEXT NOT NULL,
+    "originalFilename" TEXT NOT NULL,
+    "storagePath" TEXT NOT NULL,
+    description TEXT,
+    "uploadedById" UUID NOT NULL REFERENCES "User"(id),
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_generaldoc_project ON "GeneralDocument"("projectId");

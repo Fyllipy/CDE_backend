@@ -16,5 +16,6 @@ export const env = {
   jwtSecret: process.env.JWT_SECRET as string,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
   databaseUrl: process.env.DATABASE_URL as string,
-  uploadDir: process.env.UPLOAD_DIR ?? 'uploads'
+  uploadDir: process.env.UPLOAD_DIR ?? 'uploads',
+  generalUploadDir: process.env.GENERAL_UPLOAD_DIR ?? 'general-uploads'
 } as const;
