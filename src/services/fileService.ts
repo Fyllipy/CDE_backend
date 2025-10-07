@@ -32,13 +32,12 @@ export function ensureUploadDir() {
 }
 
 function getRevisionLabel(index: number): string {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const letter = alphabet[index] ?? `X${index}`;
-  return `rev${letter}`;
+  const label = (index + 1).toString().padStart(2, "0");
+  return `R${label}`;
 }
 
 function deriveBaseName(raw: string): string {
-  const revisionPattern = /(.*)[-_]rev([A-Za-z]+)$/i;
+  const revisionPattern = /(.*)[-_](?:rev[A-Za-z]+|R\d{2})$/i;
   const match = revisionPattern.exec(raw);
   if (match) {
     return match[1] ?? raw;

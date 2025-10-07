@@ -16,14 +16,12 @@ function ensureUploadDir() {
     return fs_1.promises.mkdir(env_1.env.uploadDir, { recursive: true });
 }
 function getRevisionLabel(index) {
-    var _a;
-    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    const letter = (_a = alphabet[index]) !== null && _a !== void 0 ? _a : `X${index}`;
-    return `rev${letter}`;
+    const label = (index + 1).toString().padStart(2, "0");
+    return `R${label}`;
 }
 function deriveBaseName(raw) {
     var _a;
-    const revisionPattern = /(.*)[-_]rev([A-Za-z]+)$/i;
+    const revisionPattern = /(.*)[-_](?:rev[A-Za-z]+|R\d{2})$/i;
     const match = revisionPattern.exec(raw);
     if (match) {
         return (_a = match[1]) !== null && _a !== void 0 ? _a : raw;
