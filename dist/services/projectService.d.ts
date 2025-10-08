@@ -24,6 +24,7 @@ export declare function getMembership(projectId: string, userId: string): Promis
 export declare function listMembers(projectId: string): Promise<ProjectMembership[]>;
 export declare function addMember(projectId: string, userId: string, role: ProjectRole): Promise<ProjectMembership>;
 export declare function removeMember(projectId: string, userId: string): Promise<void>;
+export declare function updateMemberRole(projectId: string, userId: string, role: ProjectRole): Promise<ProjectMembership>;
 export declare function setNamingStandard(projectId: string, pattern: string): Promise<void>;
 export declare function getNamingStandard(projectId: string): Promise<string | undefined>;
 export declare function assertManager(projectId: string, userId: string): Promise<void>;

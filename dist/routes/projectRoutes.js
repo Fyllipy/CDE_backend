@@ -13,6 +13,8 @@ exports.projectRouter.put("/:projectId", projectController_1.updateProjectHandle
 exports.projectRouter.delete("/:projectId", projectController_1.deleteProjectHandler);
 exports.projectRouter.get("/:projectId/members", projectController_1.listMembersHandler);
 exports.projectRouter.post("/:projectId/members", projectController_1.addMemberHandler);
+exports.projectRouter.post("/:projectId/members/by-email", projectController_1.addMemberByEmailHandler);
+exports.projectRouter.patch("/:projectId/members/:memberId", projectController_1.updateMemberRoleHandler);
 exports.projectRouter.delete("/:projectId/members/:memberId", projectController_1.removeMemberHandler);
 exports.projectRouter.patch("/:projectId/naming-standard", projectController_1.updateNamingStandardHandler);
 //# sourceMappingURL=projectRoutes.js.map

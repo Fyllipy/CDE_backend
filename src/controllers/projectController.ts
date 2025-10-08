@@ -11,8 +11,10 @@ import {
   removeMember,
   getNamingStandard,
   setNamingStandard,
-  getMembership
+  getMembership,
+  updateMemberRole
 } from "../services/projectService";
+import { findUserByEmail } from "../services/userService";
 
 function getAuthUser(req: Request): { id: string } | undefined {
   return (req as Request & { user?: { id: string } }).user;
@@ -167,6 +169,50 @@ export async function removeMemberHandler(req: Request, res: Response) {
 
   await removeMember(projectId, memberId);
   return res.status(204).send();
+}
+
+export async function addMemberByEmailHandler(req: Request, res: Response) {
+  const user = getAuthUser(req);
+  const projectId = req.params.projectId ?? '';
+  const { email, role } = req.body as { email: string; role: ProjectRole };
+  if (!user) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  if (!projectId || !email) {
+    return res.status(400).json({ message: "Project id and email are required" });
+  }
+
+  const isManager = await ensureManager(projectId, user.id);
+  if (!isManager) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  const found = await findUserByEmail(email);
+  if (!found) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  const member = await addMember(projectId, found.id, role ?? 'MEMBER');
+  return res.status(201).json({ member });
+}
+
+export async function updateMemberRoleHandler(req: Request, res: Response) {
+  const user = getAuthUser(req);
+  const projectId = req.params.projectId ?? '';
+  const memberId = req.params.memberId ?? '';
+  const { role } = req.body as { role: ProjectRole };
+  if (!user) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  if (!projectId || !memberId || !role) {
+    return res.status(400).json({ message: "Identifiers and role are required" });
+  }
+  const isManager = await ensureManager(projectId, user.id);
+  if (!isManager) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  const updated = await updateMemberRole(projectId, memberId, role);
+  return res.json({ member: updated });
 }
 
 export async function updateNamingStandardHandler(req: Request, res: Response) {

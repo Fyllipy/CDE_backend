@@ -8,9 +8,12 @@ exports.deleteProjectHandler = deleteProjectHandler;
 exports.listMembersHandler = listMembersHandler;
 exports.addMemberHandler = addMemberHandler;
 exports.removeMemberHandler = removeMemberHandler;
+exports.addMemberByEmailHandler = addMemberByEmailHandler;
+exports.updateMemberRoleHandler = updateMemberRoleHandler;
 exports.updateNamingStandardHandler = updateNamingStandardHandler;
 const roles_1 = require("../types/roles");
 const projectService_1 = require("../services/projectService");
+const userService_1 = require("../services/userService");
 function getAuthUser(req) {
     return req.user;
 }
@@ -144,6 +147,47 @@ async function removeMemberHandler(req, res) {
     }
     await (0, projectService_1.removeMember)(projectId, memberId);
     return res.status(204).send();
+}
+async function addMemberByEmailHandler(req, res) {
+    var _a;
+    const user = getAuthUser(req);
+    const projectId = (_a = req.params.projectId) !== null && _a !== void 0 ? _a : '';
+    const { email, role } = req.body;
+    if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (!projectId || !email) {
+        return res.status(400).json({ message: "Project id and email are required" });
+    }
+    const isManager = await ensureManager(projectId, user.id);
+    if (!isManager) {
+        return res.status(403).json({ message: "Forbidden" });
+    }
+    const found = await (0, userService_1.findUserByEmail)(email);
+    if (!found) {
+        return res.status(404).json({ message: "User not found" });
+    }
+    const member = await (0, projectService_1.addMember)(projectId, found.id, role !== null && role !== void 0 ? role : 'MEMBER');
+    return res.status(201).json({ member });
+}
+async function updateMemberRoleHandler(req, res) {
+    var _a, _b;
+    const user = getAuthUser(req);
+    const projectId = (_a = req.params.projectId) !== null && _a !== void 0 ? _a : '';
+    const memberId = (_b = req.params.memberId) !== null && _b !== void 0 ? _b : '';
+    const { role } = req.body;
+    if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (!projectId || !memberId || !role) {
+        return res.status(400).json({ message: "Identifiers and role are required" });
+    }
+    const isManager = await ensureManager(projectId, user.id);
+    if (!isManager) {
+        return res.status(403).json({ message: "Forbidden" });
+    }
+    const updated = await (0, projectService_1.updateMemberRole)(projectId, memberId, role);
+    return res.json({ member: updated });
 }
 async function updateNamingStandardHandler(req, res) {
     var _a;

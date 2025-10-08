@@ -9,6 +9,7 @@ exports.getMembership = getMembership;
 exports.listMembers = listMembers;
 exports.addMember = addMember;
 exports.removeMember = removeMember;
+exports.updateMemberRole = updateMemberRole;
 exports.setNamingStandard = setNamingStandard;
 exports.getNamingStandard = getNamingStandard;
 exports.assertManager = assertManager;
@@ -93,6 +94,14 @@ async function addMember(projectId, userId, role) {
 }
 async function removeMember(projectId, userId) {
     await pool_1.pool.query('DELETE FROM "ProjectMembership" WHERE "projectId" = $1 AND "userId" = $2', [projectId, userId]);
+}
+async function updateMemberRole(projectId, userId, role) {
+    const result = await pool_1.pool.query('UPDATE "ProjectMembership" SET role = $3 WHERE "projectId" = $1 AND "userId" = $2 RETURNING "projectId", "userId", role, "joinedAt"', [projectId, userId, role]);
+    const membership = result.rows[0];
+    if (!membership) {
+        throw Object.assign(new Error('Membership not found'), { status: 404 });
+    }
+    return membership;
 }
 async function setNamingStandard(projectId, pattern) {
     await pool_1.pool.query(namingStandardUpsertSql, [projectId, pattern]);

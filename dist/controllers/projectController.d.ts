@@ -7,4 +7,6 @@ export declare function deleteProjectHandler(req: Request, res: Response): Promi
 export declare function listMembersHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
 export declare function addMemberHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
 export declare function removeMemberHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function addMemberByEmailHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function updateMemberRoleHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
 export declare function updateNamingStandardHandler(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;

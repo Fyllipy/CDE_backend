@@ -141,6 +141,17 @@ export async function removeMember(projectId: string, userId: string): Promise<v
   await pool.query('DELETE FROM "ProjectMembership" WHERE "projectId" = $1 AND "userId" = $2', [projectId, userId]);
 }
 
+export async function updateMemberRole(projectId: string, userId: string, role: ProjectRole): Promise<ProjectMembership> {
+  const result = await pool.query<ProjectMembership>(
+    'UPDATE "ProjectMembership" SET role = $3 WHERE "projectId" = $1 AND "userId" = $2 RETURNING "projectId", "userId", role, "joinedAt"',
+    [projectId, userId, role]
+  );
+  const membership = result.rows[0];
+  if (!membership) {
+    throw Object.assign(new Error('Membership not found'), { status: 404 });
+  }
+  return membership;
+}
 export async function setNamingStandard(projectId: string, pattern: string): Promise<void> {
   await pool.query(namingStandardUpsertSql, [projectId, pattern]);
 }

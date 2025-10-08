@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { signJwt } from "../utils/jwt";
-import { createUser, findUserByEmail, verifyCredentials, getUserById } from "../services/userService";
+import { createUser, findUserByEmail, verifyCredentials, getUserById, setAdminFlag } from "../services/userService";
 
 export async function register(req: Request, res: Response) {
   const { name, email, password } = req.body as { name: string; email: string; password: string };
@@ -18,7 +18,7 @@ export async function register(req: Request, res: Response) {
 
   return res.status(201).json({
     token,
-    user: { id: user.id, name: user.name, email: user.email }
+    user: { id: user.id, name: user.name, email: user.email, isAdmin: user.isAdmin ?? false }
   });
 }
 
@@ -37,7 +37,7 @@ export async function login(req: Request, res: Response) {
 
   return res.json({
     token,
-    user: { id: user.id, name: user.name, email: user.email }
+    user: { id: user.id, name: user.name, email: user.email, isAdmin: user.isAdmin ?? false }
   });
 }
 
@@ -52,5 +52,26 @@ export async function me(req: Request, res: Response) {
     return res.status(404).json({ message: "User not found" });
   }
 
-  return res.json({ user: { id: user.id, name: user.name, email: user.email } });
+  return res.json({ user: { id: user.id, name: user.name, email: user.email, isAdmin: user.isAdmin ?? false } });
+}
+
+// Init admin once: if no admin exists, promote the provided email user to admin (or create it)
+export async function initAdmin(req: Request, res: Response) {
+  const { email, password, name } = req.body as { email: string; password: string; name?: string };
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Missing email/password' });
+  }
+  const exists = await (await findUserByEmail(email))?.isAdmin;
+  const anyAdmin = await (await import('../db/pool')).pool
+    .query<{ total: string }>('SELECT COUNT(*)::text AS total FROM "User" WHERE "isAdmin" = true')
+    .then(r => Number(r.rows[0]?.total ?? '0') > 0);
+  if (anyAdmin) {
+    return res.status(409).json({ message: 'Admin already initialized' });
+  }
+  let user = await findUserByEmail(email);
+  if (!user) {
+    user = await createUser({ name: name ?? 'Admin', email, password });
+  }
+  await setAdminFlag(user.id, true);
+  return res.status(201).json({ message: 'Admin initialized' });
 }
