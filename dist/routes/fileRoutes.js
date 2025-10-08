@@ -14,6 +14,7 @@ exports.fileRouter.post("/:projectId/files/upload", upload_1.upload.fields([
     { name: "file", maxCount: 1 }
 ]), fileController_1.uploadFile);
 exports.fileRouter.get("/:projectId/files/revisions/:revisionId", fileController_1.downloadRevision);
+exports.fileRouter.patch("/:projectId/files/revisions/:revisionId", fileController_1.updateRevisionHandler);
 exports.fileRouter.delete("/:projectId/files/revisions/:revisionId", fileController_1.deleteRevisionHandler);
 exports.fileRouter.delete("/:projectId/files/:fileId", fileController_1.deleteFileHandler);
 //# sourceMappingURL=fileRoutes.js.map

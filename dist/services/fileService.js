@@ -6,6 +6,7 @@ exports.validateAgainstNamingStandard = validateAgainstNamingStandard;
 exports.createOrUpdateFileRevision = createOrUpdateFileRevision;
 exports.listFiles = listFiles;
 exports.getRevisionById = getRevisionById;
+exports.updateRevisionMeta = updateRevisionMeta;
 exports.deleteFile = deleteFile;
 exports.deleteRevision = deleteRevision;
 const fs_1 = require("fs");
@@ -62,7 +63,7 @@ function splitNameAndExtension(original) {
 }
 async function createOrUpdateFileRevision(options) {
     return (0, pool_1.withTransaction)(async (client) => {
-        var _a, _b, _c, _d, _e, _f, _g;
+        var _a, _b, _c, _d, _e, _f, _g, _h;
         await ensureUploadDir();
         if (!options.pdfFile && !options.dxfFile) {
             throw Object.assign(new Error("At least one file must be provided"), { status: 400 });
@@ -99,7 +100,7 @@ async function createOrUpdateFileRevision(options) {
         };
         const pdfInfo = await writeRevisionFile(options.pdfFile, "pdf");
         const dxfInfo = await writeRevisionFile(options.dxfFile, "dxf");
-        const revisionInsert = await client.query('INSERT INTO "FileRevision" ("fileId", "revisionIndex", "revisionLabel", "uploadedById", "pdfStoragePath", "pdfOriginalFilename", "dxfStoragePath", "dxfOriginalFilename", description) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, "fileId", "revisionIndex", "revisionLabel", "uploadedById", "pdfStoragePath", "pdfOriginalFilename", "dxfStoragePath", "dxfOriginalFilename", description, "createdAt"', [
+        const revisionInsert = await client.query('INSERT INTO "FileRevision" ("fileId", "revisionIndex", "revisionLabel", "uploadedById", "pdfStoragePath", "pdfOriginalFilename", "dxfStoragePath", "dxfOriginalFilename", description, "drawingName") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, "fileId", "revisionIndex", "revisionLabel", "uploadedById", "pdfStoragePath", "pdfOriginalFilename", "dxfStoragePath", "dxfOriginalFilename", description, "drawingName", "createdAt"', [
             file.id,
             revisionIndex,
             revisionLabel,
@@ -108,7 +109,8 @@ async function createOrUpdateFileRevision(options) {
             pdfInfo.filename,
             dxfInfo.storagePath,
             dxfInfo.filename,
-            (_g = options.description) !== null && _g !== void 0 ? _g : null
+            (_g = options.description) !== null && _g !== void 0 ? _g : null,
+            (_h = options.drawingName) !== null && _h !== void 0 ? _h : null
         ]);
         const revision = revisionInsert.rows[0];
         if (!revision) {
@@ -129,7 +131,7 @@ async function listFiles(projectId) {
         return [];
     }
     const fileIds = filesResult.rows.map((item) => item.id);
-    const revisionsResult = await pool_1.pool.query('SELECT fr.id, fr."fileId", fr."revisionIndex", fr."revisionLabel", fr."uploadedById", fr."pdfStoragePath", fr."pdfOriginalFilename", fr."dxfStoragePath", fr."dxfOriginalFilename", fr.description, fr."createdAt", u.name as "uploadedByName", u.email as "uploadedByEmail" FROM "FileRevision" fr LEFT JOIN "User" u ON u.id = fr."uploadedById" WHERE fr."fileId" = ANY($1::uuid[]) ORDER BY fr."revisionIndex" DESC', [fileIds]);
+    const revisionsResult = await pool_1.pool.query('SELECT fr.id, fr."fileId", fr."revisionIndex", fr."revisionLabel", fr."uploadedById", fr."pdfStoragePath", fr."pdfOriginalFilename", fr."dxfStoragePath", fr."dxfOriginalFilename", fr.description, fr."drawingName", fr."createdAt", u.name as "uploadedByName", u.email as "uploadedByEmail" FROM "FileRevision" fr LEFT JOIN "User" u ON u.id = fr."uploadedById" WHERE fr."fileId" = ANY($1::uuid[]) ORDER BY fr."revisionIndex" DESC', [fileIds]);
     const revisionsByFile = new Map();
     for (const revision of revisionsResult.rows) {
         const existing = (_a = revisionsByFile.get(revision.fileId)) !== null && _a !== void 0 ? _a : [];
@@ -145,8 +147,20 @@ async function listFiles(projectId) {
     });
 }
 async function getRevisionById(id) {
-    const result = await pool_1.pool.query('SELECT fr.id, fr."fileId", fr."revisionIndex", fr."revisionLabel", fr."uploadedById", fr."pdfStoragePath", fr."pdfOriginalFilename", fr."dxfStoragePath", fr."dxfOriginalFilename", fr.description, fr."createdAt", u.name as "uploadedByName", u.email as "uploadedByEmail" FROM "FileRevision" fr LEFT JOIN "User" u ON u.id = fr."uploadedById" WHERE fr.id = $1', [id]);
+    const result = await pool_1.pool.query('SELECT fr.id, fr."fileId", fr."revisionIndex", fr."revisionLabel", fr."uploadedById", fr."pdfStoragePath", fr."pdfOriginalFilename", fr."dxfStoragePath", fr."dxfOriginalFilename", fr.description, fr."drawingName", fr."createdAt", u.name as "uploadedByName", u.email as "uploadedByEmail" FROM "FileRevision" fr LEFT JOIN "User" u ON u.id = fr."uploadedById" WHERE fr.id = $1', [id]);
     return result.rows[0];
+}
+async function updateRevisionMeta(projectId, revisionId, data) {
+    await (0, pool_1.withTransaction)(async (client) => {
+        var _a, _b;
+        const lookup = await client.query('SELECT fr."fileId", f."projectId" FROM "FileRevision" fr INNER JOIN "File" f ON f.id = fr."fileId" WHERE fr.id = $1', [revisionId]);
+        const row = lookup.rows[0];
+        if (!row || row.projectId !== projectId) {
+            throw Object.assign(new Error('Revision not found'), { status: 404 });
+        }
+        await client.query('UPDATE "FileRevision" SET description = COALESCE($2, description), "drawingName" = COALESCE($3, "drawingName") WHERE id = $1', [revisionId, (_a = data.description) !== null && _a !== void 0 ? _a : null, (_b = data.drawingName) !== null && _b !== void 0 ? _b : null]);
+        await client.query('UPDATE "File" SET "updatedAt" = NOW() WHERE id = $1', [row.fileId]);
+    });
 }
 async function deleteFile(projectId, fileId) {
     const fileResult = await pool_1.pool.query('SELECT id FROM "File" WHERE id = $1 AND "projectId" = $2', [fileId, projectId]);

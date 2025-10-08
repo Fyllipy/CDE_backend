@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.listProjectFiles = listProjectFiles;
 exports.uploadFile = uploadFile;
 exports.downloadRevision = downloadRevision;
+exports.updateRevisionHandler = updateRevisionHandler;
 exports.deleteFileHandler = deleteFileHandler;
 exports.deleteRevisionHandler = deleteRevisionHandler;
 const fs_1 = require("fs");
@@ -39,7 +40,7 @@ async function uploadFile(req, res) {
     var _a, _b;
     const user = getAuthUser(req);
     const projectId = (_a = req.params.projectId) !== null && _a !== void 0 ? _a : '';
-    const { description } = req.body;
+    const { description, drawingName } = req.body;
     const files = req.files;
     const pdfFile = pickFile(files, "pdfFile");
     const dxfFile = pickFile(files, "dxfFile");
@@ -90,6 +91,7 @@ async function uploadFile(req, res) {
         uploadedBy: user.id,
         namingPattern: pattern,
         description: (description === null || description === void 0 ? void 0 : description.trim()) || undefined,
+        drawingName: (drawingName === null || drawingName === void 0 ? void 0 : drawingName.trim()) || undefined,
         pdfFile: resolvedPdf
             ? {
                 buffer: resolvedPdf.buffer,
@@ -143,6 +145,29 @@ async function downloadRevision(req, res) {
         res.setHeader("Content-Type", "application/dxf");
     }
     res.send(fileBuffer);
+}
+async function updateRevisionHandler(req, res) {
+    var _a, _b;
+    const user = getAuthUser(req);
+    const projectId = (_a = req.params.projectId) !== null && _a !== void 0 ? _a : '';
+    const revisionId = (_b = req.params.revisionId) !== null && _b !== void 0 ? _b : '';
+    const { description, drawingName } = req.body;
+    if (!user) {
+        return res.status(401).json({ message: 'Unauthorized' });
+    }
+    if (!projectId || !revisionId) {
+        return res.status(400).json({ message: 'Identifiers are required' });
+    }
+    // Permitir que qualquer membro edite anotações; manter verificação de participação
+    const membership = await (0, projectService_1.getMembership)(projectId, user.id);
+    if (!membership) {
+        return res.status(403).json({ message: 'Forbidden' });
+    }
+    await (0, fileService_1.updateRevisionMeta)(projectId, revisionId, {
+        description: typeof description === 'string' ? description : undefined,
+        drawingName: typeof drawingName === 'string' ? drawingName : undefined
+    });
+    return res.status(204).send();
 }
 async function deleteFileHandler(req, res) {
     var _a, _b, _c;

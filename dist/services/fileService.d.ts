@@ -19,6 +19,7 @@ export interface FileRevision {
     pdfOriginalFilename: string | null;
     dxfStoragePath: string | null;
     dxfOriginalFilename: string | null;
+    drawingName: string | null;
     description: string | null;
     createdAt: Date;
 }
@@ -37,6 +38,7 @@ export declare function createOrUpdateFileRevision(options: {
     description?: string;
     pdfFile?: RevisionFilePayload;
     dxfFile?: RevisionFilePayload;
+    drawingName?: string;
 }): Promise<{
     file: StoredFile;
     revision: FileRevision;
@@ -45,6 +47,10 @@ export declare function listFiles(projectId: string): Promise<Array<StoredFile &
     revisions: FileRevision[];
 }>>;
 export declare function getRevisionById(id: string): Promise<FileRevision | undefined>;
+export declare function updateRevisionMeta(projectId: string, revisionId: string, data: {
+    description?: string | null;
+    drawingName?: string | null;
+}): Promise<void>;
 export declare function deleteFile(projectId: string, fileId: string): Promise<void>;
 export declare function deleteRevision(projectId: string, revisionId: string): Promise<void>;
 export {};

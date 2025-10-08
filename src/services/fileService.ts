@@ -25,6 +25,7 @@ export interface FileRevision {
   pdfOriginalFilename: string | null;
   dxfStoragePath: string | null;
   dxfOriginalFilename: string | null;
+  drawingName: string | null;
   description: string | null;
   createdAt: Date;
 }
@@ -94,6 +95,7 @@ export async function createOrUpdateFileRevision(options: {
   description?: string;
   pdfFile?: RevisionFilePayload;
   dxfFile?: RevisionFilePayload;
+  drawingName?: string;
 }): Promise<{ file: StoredFile; revision: FileRevision }> {
   return withTransaction(async (client) => {
     await ensureUploadDir();
@@ -155,7 +157,7 @@ export async function createOrUpdateFileRevision(options: {
     const dxfInfo = await writeRevisionFile(options.dxfFile, "dxf");
 
     const revisionInsert = await client.query<FileRevision>(
-      'INSERT INTO "FileRevision" ("fileId", "revisionIndex", "revisionLabel", "uploadedById", "pdfStoragePath", "pdfOriginalFilename", "dxfStoragePath", "dxfOriginalFilename", description) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, "fileId", "revisionIndex", "revisionLabel", "uploadedById", "pdfStoragePath", "pdfOriginalFilename", "dxfStoragePath", "dxfOriginalFilename", description, "createdAt"',
+      'INSERT INTO "FileRevision" ("fileId", "revisionIndex", "revisionLabel", "uploadedById", "pdfStoragePath", "pdfOriginalFilename", "dxfStoragePath", "dxfOriginalFilename", description, "drawingName") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, "fileId", "revisionIndex", "revisionLabel", "uploadedById", "pdfStoragePath", "pdfOriginalFilename", "dxfStoragePath", "dxfOriginalFilename", description, "drawingName", "createdAt"',
       [
         file.id,
         revisionIndex,
@@ -165,7 +167,8 @@ export async function createOrUpdateFileRevision(options: {
         pdfInfo.filename,
         dxfInfo.storagePath,
         dxfInfo.filename,
-        options.description ?? null
+        options.description ?? null,
+        options.drawingName ?? null
       ]
     );
 
@@ -200,7 +203,7 @@ export async function listFiles(projectId: string): Promise<Array<StoredFile & {
 
   const fileIds = filesResult.rows.map((item: StoredFile) => item.id);
   const revisionsResult = await pool.query<FileRevision>(
-    'SELECT fr.id, fr."fileId", fr."revisionIndex", fr."revisionLabel", fr."uploadedById", fr."pdfStoragePath", fr."pdfOriginalFilename", fr."dxfStoragePath", fr."dxfOriginalFilename", fr.description, fr."createdAt", u.name as "uploadedByName", u.email as "uploadedByEmail" FROM "FileRevision" fr LEFT JOIN "User" u ON u.id = fr."uploadedById" WHERE fr."fileId" = ANY($1::uuid[]) ORDER BY fr."revisionIndex" DESC',
+    'SELECT fr.id, fr."fileId", fr."revisionIndex", fr."revisionLabel", fr."uploadedById", fr."pdfStoragePath", fr."pdfOriginalFilename", fr."dxfStoragePath", fr."dxfOriginalFilename", fr.description, fr."drawingName", fr."createdAt", u.name as "uploadedByName", u.email as "uploadedByEmail" FROM "FileRevision" fr LEFT JOIN "User" u ON u.id = fr."uploadedById" WHERE fr."fileId" = ANY($1::uuid[]) ORDER BY fr."revisionIndex" DESC',
     [fileIds]
   );
 
@@ -219,10 +222,28 @@ export async function listFiles(projectId: string): Promise<Array<StoredFile & {
 
 export async function getRevisionById(id: string): Promise<FileRevision | undefined> {
   const result = await pool.query<FileRevision>(
-    'SELECT fr.id, fr."fileId", fr."revisionIndex", fr."revisionLabel", fr."uploadedById", fr."pdfStoragePath", fr."pdfOriginalFilename", fr."dxfStoragePath", fr."dxfOriginalFilename", fr.description, fr."createdAt", u.name as "uploadedByName", u.email as "uploadedByEmail" FROM "FileRevision" fr LEFT JOIN "User" u ON u.id = fr."uploadedById" WHERE fr.id = $1',
+    'SELECT fr.id, fr."fileId", fr."revisionIndex", fr."revisionLabel", fr."uploadedById", fr."pdfStoragePath", fr."pdfOriginalFilename", fr."dxfStoragePath", fr."dxfOriginalFilename", fr.description, fr."drawingName", fr."createdAt", u.name as "uploadedByName", u.email as "uploadedByEmail" FROM "FileRevision" fr LEFT JOIN "User" u ON u.id = fr."uploadedById" WHERE fr.id = $1',
     [id]
   );
   return result.rows[0];
+}
+
+export async function updateRevisionMeta(projectId: string, revisionId: string, data: { description?: string | null; drawingName?: string | null }): Promise<void> {
+  await withTransaction(async (client) => {
+    const lookup = await client.query<{ fileId: string; projectId: string }>(
+      'SELECT fr."fileId", f."projectId" FROM "FileRevision" fr INNER JOIN "File" f ON f.id = fr."fileId" WHERE fr.id = $1',
+      [revisionId]
+    );
+    const row = lookup.rows[0];
+    if (!row || row.projectId !== projectId) {
+      throw Object.assign(new Error('Revision not found'), { status: 404 });
+    }
+    await client.query(
+      'UPDATE "FileRevision" SET description = COALESCE($2, description), "drawingName" = COALESCE($3, "drawingName") WHERE id = $1',
+      [revisionId, data.description ?? null, data.drawingName ?? null]
+    );
+    await client.query('UPDATE "File" SET "updatedAt" = NOW() WHERE id = $1', [row.fileId]);
+  });
 }
 
 export async function deleteFile(projectId: string, fileId: string): Promise<void> {

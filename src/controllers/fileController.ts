@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { promises as fs } from "fs";
-import { listFiles, createOrUpdateFileRevision, getRevisionById, deleteFile, deleteRevision } from "../services/fileService";
+import { listFiles, createOrUpdateFileRevision, getRevisionById, deleteFile, deleteRevision, updateRevisionMeta } from "../services/fileService";
 import { getMembership, getNamingStandard, assertManager } from "../services/projectService";
 
 function getAuthUser(req: Request): { id: string } | undefined {
@@ -41,7 +41,7 @@ function pickFile(map: UploadedFileMap | undefined, key: string): Express.Multer
 export async function uploadFile(req: Request, res: Response) {
   const user = getAuthUser(req);
   const projectId = req.params.projectId ?? '';
-  const { description } = req.body as { description?: string };
+  const { description, drawingName } = req.body as { description?: string; drawingName?: string };
   const files = (req as Request & { files?: UploadedFileMap }).files;
 
   const pdfFile = pickFile(files, "pdfFile");
@@ -100,6 +100,7 @@ export async function uploadFile(req: Request, res: Response) {
     uploadedBy: user.id,
     namingPattern: pattern,
     description: description?.trim() || undefined,
+    drawingName: drawingName?.trim() || undefined,
     pdfFile: resolvedPdf
       ? {
           buffer: resolvedPdf.buffer,
@@ -161,6 +162,33 @@ export async function downloadRevision(req: Request, res: Response) {
     res.setHeader("Content-Type", "application/dxf");
   }
   res.send(fileBuffer);
+}
+
+export async function updateRevisionHandler(req: Request, res: Response) {
+  const user = getAuthUser(req);
+  const projectId = req.params.projectId ?? '';
+  const revisionId = req.params.revisionId ?? '';
+  const { description, drawingName } = req.body as { description?: string; drawingName?: string };
+
+  if (!user) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+  if (!projectId || !revisionId) {
+    return res.status(400).json({ message: 'Identifiers are required' });
+  }
+
+  // Permitir que qualquer membro edite anotações; manter verificação de participação
+  const membership = await getMembership(projectId, user.id);
+  if (!membership) {
+    return res.status(403).json({ message: 'Forbidden' });
+  }
+
+  await updateRevisionMeta(projectId, revisionId, {
+    description: typeof description === 'string' ? description : undefined,
+    drawingName: typeof drawingName === 'string' ? drawingName : undefined
+  });
+
+  return res.status(204).send();
 }
 
 export async function deleteFileHandler(req: Request, res: Response) {

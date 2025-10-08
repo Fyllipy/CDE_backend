@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/authMiddleware";
 import { upload } from "../config/upload";
-import { listProjectFiles, uploadFile, downloadRevision, deleteFileHandler, deleteRevisionHandler } from "../controllers/fileController";
+import { listProjectFiles, uploadFile, downloadRevision, deleteFileHandler, deleteRevisionHandler, updateRevisionHandler } from "../controllers/fileController";
 
 export const fileRouter = Router();
 
@@ -18,5 +18,6 @@ fileRouter.post(
   uploadFile
 );
 fileRouter.get("/:projectId/files/revisions/:revisionId", downloadRevision);
+fileRouter.patch("/:projectId/files/revisions/:revisionId", updateRevisionHandler);
 fileRouter.delete("/:projectId/files/revisions/:revisionId", deleteRevisionHandler);
 fileRouter.delete("/:projectId/files/:fileId", deleteFileHandler);
