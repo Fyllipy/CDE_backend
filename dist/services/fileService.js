@@ -62,30 +62,54 @@ function splitNameAndExtension(original) {
 }
 async function createOrUpdateFileRevision(options) {
     return (0, pool_1.withTransaction)(async (client) => {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b, _c, _d, _e, _f, _g;
         await ensureUploadDir();
-        const nameInfo = splitNameAndExtension((_a = options.overrideBaseName) !== null && _a !== void 0 ? _a : options.originalFilename);
+        if (!options.pdfFile && !options.dxfFile) {
+            throw Object.assign(new Error("At least one file must be provided"), { status: 400 });
+        }
+        const primaryFile = (_a = options.pdfFile) !== null && _a !== void 0 ? _a : options.dxfFile;
+        const nameInfo = splitNameAndExtension((_b = options.overrideBaseName) !== null && _b !== void 0 ? _b : primaryFile.originalFilename);
         const baseName = deriveBaseName(nameInfo.baseName);
         await validateAgainstNamingStandard(baseName, options.namingPattern);
         const fileResult = await client.query('SELECT id, "projectId", "baseName", extension, "currentRevisionId", "createdAt", "updatedAt" FROM "File" WHERE "projectId" = $1 AND "baseName" = $2', [options.projectId, baseName]);
-        let file = (_b = fileResult.rows[0]) !== null && _b !== void 0 ? _b : null;
+        let file = (_c = fileResult.rows[0]) !== null && _c !== void 0 ? _c : null;
         let revisionIndex = 0;
         if (!file) {
-            const inserted = await client.query('INSERT INTO "File" ("projectId", "baseName", extension) VALUES ($1, $2, $3) RETURNING id, "projectId", "baseName", extension, "currentRevisionId", "createdAt", "updatedAt"', [options.projectId, baseName, nameInfo.extension]);
-            file = (_c = inserted.rows[0]) !== null && _c !== void 0 ? _c : null;
+            const primaryExtension = options.pdfFile ? "pdf" : options.dxfFile ? "dxf" : nameInfo.extension;
+            const inserted = await client.query('INSERT INTO "File" ("projectId", "baseName", extension) VALUES ($1, $2, $3) RETURNING id, "projectId", "baseName", extension, "currentRevisionId", "createdAt", "updatedAt"', [options.projectId, baseName, primaryExtension]);
+            file = (_d = inserted.rows[0]) !== null && _d !== void 0 ? _d : null;
         }
         else {
             const countResult = await client.query('SELECT COUNT(*)::text as total FROM "FileRevision" WHERE "fileId" = $1', [file.id]);
-            revisionIndex = Number((_e = (_d = countResult.rows[0]) === null || _d === void 0 ? void 0 : _d.total) !== null && _e !== void 0 ? _e : "0");
+            revisionIndex = Number((_f = (_e = countResult.rows[0]) === null || _e === void 0 ? void 0 : _e.total) !== null && _f !== void 0 ? _f : "0");
         }
         if (!file) {
             throw new Error("Unable to persist file metadata");
         }
         const revisionLabel = getRevisionLabel(revisionIndex);
-        const storagePath = buildStoragePath(options.projectId, file.id, revisionLabel, nameInfo.extension);
-        await fs_1.promises.mkdir((0, path_1.join)(env_1.env.uploadDir, options.projectId, file.id), { recursive: true });
-        await fs_1.promises.writeFile(storagePath, options.fileBuffer);
-        const revisionInsert = await client.query('INSERT INTO "FileRevision" ("fileId", "revisionIndex", "revisionLabel", "uploadedById", "storagePath", "originalFilename", description) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, "fileId", "revisionIndex", "revisionLabel", "uploadedById", "storagePath", "originalFilename", description, "createdAt"', [file.id, revisionIndex, revisionLabel, options.uploadedBy, storagePath, options.originalFilename, (_f = options.description) !== null && _f !== void 0 ? _f : null]);
+        const revisionDir = (0, path_1.join)(env_1.env.uploadDir, options.projectId, file.id);
+        await fs_1.promises.mkdir(revisionDir, { recursive: true });
+        const writeRevisionFile = async (payload, extension) => {
+            if (!payload) {
+                return { storagePath: null, filename: null };
+            }
+            const storagePath = buildStoragePath(options.projectId, file.id, revisionLabel, extension);
+            await fs_1.promises.writeFile(storagePath, payload.buffer);
+            return { storagePath, filename: `${baseName}.${extension}` };
+        };
+        const pdfInfo = await writeRevisionFile(options.pdfFile, "pdf");
+        const dxfInfo = await writeRevisionFile(options.dxfFile, "dxf");
+        const revisionInsert = await client.query('INSERT INTO "FileRevision" ("fileId", "revisionIndex", "revisionLabel", "uploadedById", "pdfStoragePath", "pdfOriginalFilename", "dxfStoragePath", "dxfOriginalFilename", description) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, "fileId", "revisionIndex", "revisionLabel", "uploadedById", "pdfStoragePath", "pdfOriginalFilename", "dxfStoragePath", "dxfOriginalFilename", description, "createdAt"', [
+            file.id,
+            revisionIndex,
+            revisionLabel,
+            options.uploadedBy,
+            pdfInfo.storagePath,
+            pdfInfo.filename,
+            dxfInfo.storagePath,
+            dxfInfo.filename,
+            (_g = options.description) !== null && _g !== void 0 ? _g : null
+        ]);
         const revision = revisionInsert.rows[0];
         if (!revision) {
             throw new Error("Unable to persist file revision");
@@ -105,7 +129,7 @@ async function listFiles(projectId) {
         return [];
     }
     const fileIds = filesResult.rows.map((item) => item.id);
-    const revisionsResult = await pool_1.pool.query('SELECT fr.id, fr."fileId", fr."revisionIndex", fr."revisionLabel", fr."uploadedById", fr."storagePath", fr."originalFilename", fr.description, fr."createdAt", u.name as "uploadedByName", u.email as "uploadedByEmail" FROM "FileRevision" fr LEFT JOIN "User" u ON u.id = fr."uploadedById" WHERE fr."fileId" = ANY($1::uuid[]) ORDER BY fr."revisionIndex" DESC', [fileIds]);
+    const revisionsResult = await pool_1.pool.query('SELECT fr.id, fr."fileId", fr."revisionIndex", fr."revisionLabel", fr."uploadedById", fr."pdfStoragePath", fr."pdfOriginalFilename", fr."dxfStoragePath", fr."dxfOriginalFilename", fr.description, fr."createdAt", u.name as "uploadedByName", u.email as "uploadedByEmail" FROM "FileRevision" fr LEFT JOIN "User" u ON u.id = fr."uploadedById" WHERE fr."fileId" = ANY($1::uuid[]) ORDER BY fr."revisionIndex" DESC', [fileIds]);
     const revisionsByFile = new Map();
     for (const revision of revisionsResult.rows) {
         const existing = (_a = revisionsByFile.get(revision.fileId)) !== null && _a !== void 0 ? _a : [];
@@ -121,7 +145,7 @@ async function listFiles(projectId) {
     });
 }
 async function getRevisionById(id) {
-    const result = await pool_1.pool.query('SELECT fr.id, fr."fileId", fr."revisionIndex", fr."revisionLabel", fr."uploadedById", fr."storagePath", fr."originalFilename", fr.description, fr."createdAt", u.name as "uploadedByName", u.email as "uploadedByEmail" FROM "FileRevision" fr LEFT JOIN "User" u ON u.id = fr."uploadedById" WHERE fr.id = $1', [id]);
+    const result = await pool_1.pool.query('SELECT fr.id, fr."fileId", fr."revisionIndex", fr."revisionLabel", fr."uploadedById", fr."pdfStoragePath", fr."pdfOriginalFilename", fr."dxfStoragePath", fr."dxfOriginalFilename", fr.description, fr."createdAt", u.name as "uploadedByName", u.email as "uploadedByEmail" FROM "FileRevision" fr LEFT JOIN "User" u ON u.id = fr."uploadedById" WHERE fr.id = $1', [id]);
     return result.rows[0];
 }
 async function deleteFile(projectId, fileId) {
@@ -129,14 +153,17 @@ async function deleteFile(projectId, fileId) {
     if (!fileResult.rowCount) {
         throw Object.assign(new Error('File not found'), { status: 404 });
     }
-    const revisions = await pool_1.pool.query('SELECT "storagePath" FROM "FileRevision" WHERE "fileId" = $1', [fileId]);
+    const revisions = await pool_1.pool.query('SELECT "pdfStoragePath", "dxfStoragePath" FROM "FileRevision" WHERE "fileId" = $1', [fileId]);
     for (const revision of revisions.rows) {
-        try {
-            await fs_1.promises.unlink(revision.storagePath);
-        }
-        catch (err) {
-            if (err.code !== 'ENOENT') {
-                throw err;
+        const paths = [revision.pdfStoragePath, revision.dxfStoragePath].filter(Boolean);
+        for (const path of paths) {
+            try {
+                await fs_1.promises.unlink(path);
+            }
+            catch (err) {
+                if (err.code !== 'ENOENT') {
+                    throw err;
+                }
             }
         }
     }
@@ -151,7 +178,7 @@ async function deleteFile(projectId, fileId) {
 }
 async function deleteRevision(projectId, revisionId) {
     await (0, pool_1.withTransaction)(async (client) => {
-        const revisionResult = await client.query('SELECT fr."fileId", f."projectId", fr."storagePath" FROM "FileRevision" fr INNER JOIN "File" f ON f.id = fr."fileId" WHERE fr.id = $1', [revisionId]);
+        const revisionResult = await client.query('SELECT fr."fileId", f."projectId", fr."pdfStoragePath", fr."dxfStoragePath" FROM "FileRevision" fr INNER JOIN "File" f ON f.id = fr."fileId" WHERE fr.id = $1', [revisionId]);
         const revision = revisionResult.rows[0];
         if (!revision) {
             throw Object.assign(new Error('Revision not found'), { status: 404 });
@@ -159,12 +186,15 @@ async function deleteRevision(projectId, revisionId) {
         if (revision.projectId !== projectId) {
             throw Object.assign(new Error('Revision not found'), { status: 404 });
         }
-        try {
-            await fs_1.promises.unlink(revision.storagePath);
-        }
-        catch (err) {
-            if (err.code !== 'ENOENT') {
-                throw err;
+        const paths = [revision.pdfStoragePath, revision.dxfStoragePath].filter(Boolean);
+        for (const path of paths) {
+            try {
+                await fs_1.promises.unlink(path);
+            }
+            catch (err) {
+                if (err.code !== 'ENOENT') {
+                    throw err;
+                }
             }
         }
         await client.query('DELETE FROM "FileRevision" WHERE id = $1', [revisionId]);

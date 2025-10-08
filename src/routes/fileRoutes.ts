@@ -8,7 +8,15 @@ export const fileRouter = Router();
 fileRouter.use(requireAuth);
 
 fileRouter.get("/:projectId/files", listProjectFiles);
-fileRouter.post("/:projectId/files/upload", upload.single("file"), uploadFile);
+fileRouter.post(
+  "/:projectId/files/upload",
+  upload.fields([
+    { name: "pdfFile", maxCount: 1 },
+    { name: "dxfFile", maxCount: 1 },
+    { name: "file", maxCount: 1 }
+  ]),
+  uploadFile
+);
 fileRouter.get("/:projectId/files/revisions/:revisionId", downloadRevision);
 fileRouter.delete("/:projectId/files/revisions/:revisionId", deleteRevisionHandler);
 fileRouter.delete("/:projectId/files/:fileId", deleteFileHandler);
