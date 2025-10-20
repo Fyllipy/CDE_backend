@@ -63,6 +63,8 @@ CREATE TABLE IF NOT EXISTS "KanbanColumn" (
     name TEXT NOT NULL,
     position INTEGER NOT NULL,
     color TEXT NOT NULL DEFAULT '#2563eb',
+    "wipLimit" INTEGER,
+    "archivedAt" TIMESTAMPTZ,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT unique_project_column UNIQUE ("projectId", position)
@@ -76,13 +78,60 @@ CREATE TABLE IF NOT EXISTS "KanbanCard" (
     description TEXT,
     position INTEGER NOT NULL,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    priority TEXT,
+    "startDate" TIMESTAMPTZ,
+    "dueDate" TIMESTAMPTZ,
+    "completedAt" TIMESTAMPTZ,
+    "archivedAt" TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS "KanbanLabel" (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "projectId" UUID NOT NULL REFERENCES "Project"(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    color TEXT NOT NULL,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT unique_project_label_name UNIQUE ("projectId", name)
+);
+
+CREATE TABLE IF NOT EXISTS "KanbanCardLabel" (
+    "cardId" UUID NOT NULL REFERENCES "KanbanCard"(id) ON DELETE CASCADE,
+    "labelId" UUID NOT NULL REFERENCES "KanbanLabel"(id) ON DELETE CASCADE,
+    "addedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY ("cardId", "labelId")
+);
+
+CREATE TABLE IF NOT EXISTS "KanbanCardAssignee" (
+    "cardId" UUID NOT NULL REFERENCES "KanbanCard"(id) ON DELETE CASCADE,
+    "userId" UUID NOT NULL REFERENCES "User"(id) ON DELETE CASCADE,
+    "assignedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY ("cardId", "userId")
 );
 
 CREATE INDEX IF NOT EXISTS idx_file_project ON "File"("projectId");
 CREATE INDEX IF NOT EXISTS idx_filerevision_file ON "FileRevision"("fileId");
 CREATE INDEX IF NOT EXISTS idx_kanbancolumn_project ON "KanbanColumn"("projectId");
 CREATE INDEX IF NOT EXISTS idx_kanbancard_column ON "KanbanCard"("columnId");
+
+CREATE TABLE IF NOT EXISTS "KanbanComment" (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "cardId" UUID NOT NULL REFERENCES "KanbanCard"(id) ON DELETE CASCADE,
+    "authorId" UUID NOT NULL REFERENCES "User"(id),
+    body TEXT NOT NULL,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS "KanbanActivity" (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "cardId" UUID NOT NULL REFERENCES "KanbanCard"(id) ON DELETE CASCADE,
+    "actorId" UUID NOT NULL REFERENCES "User"(id),
+    type TEXT NOT NULL,
+    data JSONB,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 CREATE TABLE IF NOT EXISTS "GeneralDocument" (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

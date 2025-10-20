@@ -9,57 +9,34 @@ import {
   deleteCard,
   moveCard,
   reorderColumns,
-  reorderCards
+  reorderCards,
+  getCardDetails,
 } from "../services/kanbanService";
-import { getMembership } from "../services/projectService";
-
-function getAuthUser(req: Request): { id: string } | undefined {
-  return (req as Request & { user?: { id: string } }).user;
-}
-
-async function ensureMember(projectId: string, userId: string): Promise<boolean> {
-  const membership = await getMembership(projectId, userId);
-  return Boolean(membership);
-}
 
 export async function getBoard(req: Request, res: Response) {
-  const user = getAuthUser(req);
-  const projectId = req.params.projectId ?? '';
-
-  if (!user) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (!projectId) {
-    return res.status(400).json({ message: "Project id is required" });
-  }
-
-  const isMember = await ensureMember(projectId, user.id);
-  if (!isMember) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
-
+  const projectId = req.params.projectId ?? "";
   const board = await listBoard(projectId);
-  return res.json({ board });
+  // also return labels for the project
+  const { getLabelsByProjectId } = require('../services/kanbanLabelService');
+  const labels = await getLabelsByProjectId(projectId);
+  return res.json({ board, labels });
 }
 
+// export async function getCardHandler(req: Request, res: Response) {
+//   const cardId = req.params.cardId ?? "";
+//   const card = await getCard(cardId);
+//   if (!card) {
+//     return res.status(404).json({ message: "Card not found" });
+//   }
+//   if (card.projectId !== req.params.projectId) {
+//     return res.status(403).json({ message: "Forbidden: Card does not belong to this project" });
+//   }
+//   return res.json({ card });
+// }
+
 export async function createColumnHandler(req: Request, res: Response) {
-  const user = getAuthUser(req);
-  const projectId = req.params.projectId ?? '';
+  const projectId = req.params.projectId ?? "";
   const { name, color } = req.body as { name: string; color?: string };
-
-  if (!user) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (!projectId) {
-    return res.status(400).json({ message: "Project id is required" });
-  }
-
-  const isMember = await ensureMember(projectId, user.id);
-  if (!isMember) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
 
   if (!name) {
     return res.status(400).json({ message: "Column name is required" });
@@ -69,73 +46,38 @@ export async function createColumnHandler(req: Request, res: Response) {
   return res.status(201).json({ column });
 }
 
-export async function renameColumnHandler(req: Request, res: Response) {
-  const user = getAuthUser(req);
-  const projectId = req.params.projectId ?? '';
-  const columnId = req.params.columnId ?? '';
-  const { name, color } = req.body as { name?: string; color?: string };
+export async function updateColumnHandler(req: Request, res: Response) {
+  const columnId = req.params.columnId ?? "";
+  const { name, color, wipLimit, archivedAt } = req.body as {
+    name?: string;
+    color?: string;
+    wipLimit?: number | null;
+    archivedAt?: string | null;
+  };
 
-  if (!user) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (!projectId || !columnId) {
-    return res.status(400).json({ message: "Identifiers are required" });
-  }
-
-  if (!name && !color) {
+  if (!name && !color && wipLimit === undefined && archivedAt === undefined) {
     return res.status(400).json({ message: "Nothing to update" });
   }
 
-  const isMember = await ensureMember(projectId, user.id);
-  if (!isMember) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
-
-  const column = await updateColumn(columnId, { name, color });
+  const column = await updateColumn(columnId, {
+    name,
+    color,
+    wipLimit,
+    archivedAt,
+  });
   return res.json({ column });
 }
 
 export async function deleteColumnHandler(req: Request, res: Response) {
-  const user = getAuthUser(req);
-  const projectId = req.params.projectId ?? '';
-  const columnId = req.params.columnId ?? '';
-
-  if (!user) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (!projectId || !columnId) {
-    return res.status(400).json({ message: "Identifiers are required" });
-  }
-
-  const isMember = await ensureMember(projectId, user.id);
-  if (!isMember) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
-
+  const columnId = req.params.columnId ?? "";
   await deleteColumn(columnId);
   return res.status(204).send();
 }
 
 export async function createCardHandler(req: Request, res: Response) {
-  const user = getAuthUser(req);
-  const projectId = req.params.projectId ?? '';
-  const columnId = req.params.columnId ?? '';
+  const projectId = req.params.projectId ?? "";
+  const columnId = req.params.columnId ?? "";
   const { title, description } = req.body as { title: string; description?: string };
-
-  if (!user) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (!projectId || !columnId) {
-    return res.status(400).json({ message: "Identifiers are required" });
-  }
-
-  const isMember = await ensureMember(projectId, user.id);
-  if (!isMember) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
 
   if (!title) {
     return res.status(400).json({ message: "Title is required" });
@@ -146,114 +88,84 @@ export async function createCardHandler(req: Request, res: Response) {
 }
 
 export async function updateCardHandler(req: Request, res: Response) {
-  const user = getAuthUser(req);
-  const projectId = req.params.projectId ?? '';
-  const cardId = req.params.cardId ?? '';
-  const { title, description } = req.body as { title?: string; description?: string | null };
+  const cardId = req.params.cardId ?? "";
+  const { title, description, priority, startDate, dueDate, completedAt } = req.body as {
+    title?: string;
+    description?: string | null;
+    priority?: string | null;
+    startDate?: string | null;
+    dueDate?: string | null;
+    completedAt?: string | null;
+  };
 
-  if (!user) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (!projectId || !cardId) {
-    return res.status(400).json({ message: "Identifiers are required" });
-  }
-
-  const isMember = await ensureMember(projectId, user.id);
-  if (!isMember) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
-
-  const card = await updateCard(cardId, { title, description: description ?? null });
+  const card = await updateCard(cardId, {
+    title,
+    description: description ?? null,
+    priority,
+    startDate,
+    dueDate,
+    completedAt,
+  });
   return res.json({ card });
 }
 
 export async function deleteCardHandler(req: Request, res: Response) {
-  const user = getAuthUser(req);
-  const projectId = req.params.projectId ?? '';
-  const cardId = req.params.cardId ?? '';
-
-  if (!user) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (!projectId || !cardId) {
-    return res.status(400).json({ message: "Identifiers are required" });
-  }
-
-  const isMember = await ensureMember(projectId, user.id);
-  if (!isMember) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
-
+  const cardId = req.params.cardId ?? "";
   await deleteCard(cardId);
   return res.status(204).send();
 }
 
 export async function moveCardHandler(req: Request, res: Response) {
-  const user = getAuthUser(req);
-  const projectId = req.params.projectId ?? '';
-  const cardId = req.params.cardId ?? '';
+  const cardId = req.params.cardId ?? "";
   const { toColumnId, position } = req.body as { toColumnId: string; position: number };
-
-  if (!user) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (!projectId || !cardId || !toColumnId) {
-    return res.status(400).json({ message: "Identifiers are required" });
-  }
-
-  const isMember = await ensureMember(projectId, user.id);
-  if (!isMember) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
 
   await moveCard(cardId, toColumnId, position);
   return res.status(204).send();
 }
 
 export async function reorderColumnsHandler(req: Request, res: Response) {
-  const user = getAuthUser(req);
-  const projectId = req.params.projectId ?? '';
+  const projectId = req.params.projectId ?? "";
   const { orderedIds } = req.body as { orderedIds: string[] };
-
-  if (!user) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (!projectId) {
-    return res.status(400).json({ message: "Project id is required" });
-  }
-
-  const isMember = await ensureMember(projectId, user.id);
-  if (!isMember) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
-
   await reorderColumns(projectId, orderedIds);
   return res.status(204).send();
 }
 
 export async function reorderCardsHandler(req: Request, res: Response) {
-  const user = getAuthUser(req);
-  const projectId = req.params.projectId ?? '';
-  const columnId = req.params.columnId ?? '';
+  const columnId = req.params.columnId ?? "";
   const { orderedIds } = req.body as { orderedIds: string[] };
-
-  if (!user) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (!projectId || !columnId) {
-    return res.status(400).json({ message: "Identifiers are required" });
-  }
-
-  const isMember = await ensureMember(projectId, user.id);
-  if (!isMember) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
-
   await reorderCards(columnId, orderedIds);
   return res.status(204).send();
+}
+
+export async function getCardHandler(req: Request, res: Response) {
+  const projectId = req.params.projectId ?? "";
+  const cardId = req.params.cardId ?? "";
+
+  if (!projectId) {
+    return res.status(400).json({ message: "Project ID is required" });
+  }
+
+  if (!cardId) {
+    return res.status(400).json({ message: "Card ID is required" });
+  }
+
+  try {
+    const card = await getCardDetails(cardId);
+
+    if (!card) {
+      return res.status(404).json({ message: "Card not found" });
+    }
+
+    if (card.projectId !== projectId) {
+      return res.status(403).json({ message: "Card does not belong to this project" });
+    }
+
+    return res.json({ card });
+  } catch (error) {
+    console.error('Error in getCardHandler:', error);
+    return res.status(500).json({
+      message: "Internal server error",
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 }
