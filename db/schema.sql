@@ -86,6 +86,12 @@ CREATE TABLE IF NOT EXISTS "KanbanCard" (
     "archivedAt" TIMESTAMPTZ
 );
 
+ALTER TABLE "KanbanCard"
+    ADD COLUMN IF NOT EXISTS "parentId" UUID REFERENCES "KanbanCard"(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_kanbancard_project ON "KanbanCard"("projectId");
+CREATE INDEX IF NOT EXISTS idx_kanbancard_archived ON "KanbanCard"("archivedAt");
+CREATE INDEX IF NOT EXISTS idx_kanbancard_parent ON "KanbanCard"("parentId");
+
 CREATE TABLE IF NOT EXISTS "KanbanLabel" (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     "projectId" UUID NOT NULL REFERENCES "Project"(id) ON DELETE CASCADE,
@@ -109,6 +115,54 @@ CREATE TABLE IF NOT EXISTS "KanbanCardAssignee" (
     "assignedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY ("cardId", "userId")
 );
+
+CREATE TABLE IF NOT EXISTS "KanbanChecklist" (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "cardId" UUID NOT NULL REFERENCES "KanbanCard"(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS "KanbanChecklistItem" (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "checklistId" UUID NOT NULL REFERENCES "KanbanChecklist"(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    "doneAt" TIMESTAMPTZ,
+    "assigneeId" UUID REFERENCES "User"(id) ON DELETE SET NULL,
+    "dueDate" TIMESTAMPTZ,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS "KanbanCustomFieldDef" (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "projectId" UUID NOT NULL REFERENCES "Project"(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    options JSONB,
+    required BOOLEAN NOT NULL DEFAULT FALSE,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT unique_project_field_name UNIQUE ("projectId", name)
+);
+
+CREATE TABLE IF NOT EXISTS "KanbanCardCustomField" (
+    "cardId" UUID NOT NULL REFERENCES "KanbanCard"(id) ON DELETE CASCADE,
+    "fieldId" UUID NOT NULL REFERENCES "KanbanCustomFieldDef"(id) ON DELETE CASCADE,
+    value JSONB,
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY ("cardId", "fieldId")
+);
+
+CREATE INDEX IF NOT EXISTS idx_kanbanchecklist_card ON "KanbanChecklist"("cardId");
+CREATE INDEX IF NOT EXISTS idx_kanbanchecklistitem_checklist ON "KanbanChecklistItem"("checklistId");
+CREATE INDEX IF NOT EXISTS idx_kanbanchecklistitem_assignee ON "KanbanChecklistItem"("assigneeId");
+CREATE INDEX IF NOT EXISTS idx_kanbancustomfield_project ON "KanbanCustomFieldDef"("projectId");
+CREATE INDEX IF NOT EXISTS idx_kanbancardcustomfield_card ON "KanbanCardCustomField"("cardId");
+CREATE INDEX IF NOT EXISTS idx_kanbancardcustomfield_field ON "KanbanCardCustomField"("fieldId");
 
 CREATE INDEX IF NOT EXISTS idx_file_project ON "File"("projectId");
 CREATE INDEX IF NOT EXISTS idx_filerevision_file ON "FileRevision"("fileId");
