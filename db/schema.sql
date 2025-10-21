@@ -47,8 +47,11 @@ CREATE TABLE IF NOT EXISTS "FileRevision" (
     "revisionIndex" INTEGER NOT NULL,
     "revisionLabel" TEXT NOT NULL,
     "uploadedById" UUID NOT NULL REFERENCES "User"(id),
-    "storagePath" TEXT NOT NULL,
-    "originalFilename" TEXT NOT NULL,
+    "pdfStoragePath" TEXT,
+    "pdfOriginalFilename" TEXT,
+    "dxfStoragePath" TEXT,
+    "dxfOriginalFilename" TEXT,
+    "drawingName" TEXT,
     description TEXT,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT unique_file_revision UNIQUE ("fileId", "revisionIndex")
